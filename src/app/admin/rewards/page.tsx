@@ -79,7 +79,7 @@ export default function AdminRewardsPage() {
         <p className="text-[11px] uppercase tracking-widest text-white/40">Current jackpot</p>
         <p className="font-display text-5xl text-sand">{tokens(poolBal)}</p>
         <p className="mt-1 text-xs text-white/40">
-          20% table fees this month: {tokens(commission)} · 10% of fees sit in this pool
+          20% table fees this month: {tokens(commission)} · 20% of fees sit in this pool
         </p>
         <Button className="mt-4" disabled={busy || poolBal <= 0} onClick={draw}>
           {busy ? "Drawing…" : "Draw 10 subscribers"}

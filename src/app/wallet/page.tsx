@@ -3,18 +3,23 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { AppFrame } from "@/components/app-frame";
 import { BuyTokensButton } from "@/components/buy-tokens";
-import { Button, Card } from "@/components/ui";
+import { Badge, Button, Card } from "@/components/ui";
 import { useLive } from "@/hooks/use-live";
 import { formatWhen, tokens } from "@/lib/utils";
 
-type Row = { id: string; amount: number; note: string | null; createdAt: string };
+type Row = { id: string; info: string; amount: number; note: string | null; createdAt: string };
+
+function infoTone(info: string): "win" | "lost" | "pending" | "neutral" {
+  if (info === "Won" || info === "Bought") return "win";
+  if (info === "Lost" || info === "Convert") return "lost";
+  return "neutral";
+}
 
 export default function WalletPage() {
   const [balance, setBalance] = useState(0);
   const [pool, setPool] = useState(0);
   const [days, setDays] = useState(7);
-  const [buy, setBuy] = useState<Row[]>([]);
-  const [convert, setConvert] = useState<Row[]>([]);
+  const [rows, setRows] = useState<Row[]>([]);
   const [modal, setModal] = useState<"gcash" | "withdraw" | null>(null);
   const [withdrawError, setWithdrawError] = useState("");
   const [withdrawing, setWithdrawing] = useState(false);
@@ -29,8 +34,7 @@ export default function WalletPage() {
     if (tokenHist.ok) {
       const data = await tokenHist.json();
       setDays(data.days);
-      setBuy(data.buy);
-      setConvert(data.convert);
+      setRows(data.rows ?? []);
     }
   }, []);
 
@@ -80,40 +84,43 @@ export default function WalletPage() {
         </div>
       </Card>
 
-      <h2 className="mt-8 font-display text-2xl text-[#d5e07a]">Buy history</h2>
+      <h2 className="mt-8 font-display text-2xl">History</h2>
       <p className="text-xs text-white/40">Last {days} days</p>
-      <div className="mt-3 space-y-2">
-        {buy.length === 0 && <p className="text-sm text-white/40">No token purchases in this window.</p>}
-        {buy.map((row) => (
-          <div
-            key={row.id}
-            className="flex items-center justify-between rounded-[5px] border border-olive/30 bg-olive/10 px-4 py-3"
-          >
-            <div>
-              <p className="text-sm">{row.note || "Buy Tokens"}</p>
-              <p className="text-[11px] text-white/40">{formatWhen(row.createdAt)}</p>
-            </div>
-            <p className="text-[#d5e07a]">+{tokens(row.amount)}</p>
-          </div>
-        ))}
-      </div>
-
-      <h2 className="mt-8 font-display text-2xl text-[#f0a8a3]">Withdraw history</h2>
-      <p className="text-xs text-white/40">Last {days} days</p>
-      <div className="mt-3 space-y-2">
-        {convert.length === 0 && <p className="text-sm text-white/40">No withdrawals in this window.</p>}
-        {convert.map((row) => (
-          <div
-            key={row.id}
-            className="flex items-center justify-between rounded-[5px] border border-brick/30 bg-brick/10 px-4 py-3"
-          >
-            <div>
-              <p className="text-sm">{row.note || "Withdraw Tokens"}</p>
-              <p className="text-[11px] text-white/40">{formatWhen(row.createdAt)}</p>
-            </div>
-            <p className="text-[#f0a8a3]">{tokens(row.amount)}</p>
-          </div>
-        ))}
+      <div className="mt-3 overflow-x-auto rounded-[5px] border border-white/10">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-white/5 text-[11px] uppercase tracking-wider text-white/40">
+            <tr>
+              <th className="px-3 py-2 font-medium">When</th>
+              <th className="px-3 py-2 font-medium">Info</th>
+              <th className="px-3 py-2 font-medium text-right">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={3} className="px-3 py-4 text-white/40">
+                  No wallet activity in this window.
+                </td>
+              </tr>
+            )}
+            {rows.map((row) => (
+              <tr key={row.id} className="border-t border-white/10">
+                <td className="px-3 py-2.5 text-white/55">{formatWhen(row.createdAt)}</td>
+                <td className="px-3 py-2.5">
+                  <Badge tone={infoTone(row.info)}>{row.info}</Badge>
+                </td>
+                <td
+                  className={`px-3 py-2.5 text-right ${
+                    row.amount >= 0 ? "text-[#d5e07a]" : "text-[#f0a8a3]"
+                  }`}
+                >
+                  {row.amount >= 0 ? "+" : ""}
+                  {tokens(row.amount)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       {modal === "gcash" && (

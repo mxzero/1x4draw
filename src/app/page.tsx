@@ -8,7 +8,7 @@ export default function HomePage() {
         <p className="text-[11px] uppercase tracking-[0.35em] text-white/40">Fixed-odds multiplayer</p>
         <Logo className="mt-4 text-7xl" />
         <p className="mt-4 max-w-xs text-white/70">
-          Five seats. One draw. Winner takes 4× the stake. 20% table fee funds the house — 10% of that feeds the monthly subscriber pool.
+          Five seats. One draw. Winner takes 4× the stake. 20% table fee funds the house — 20% of that feeds the monthly subscriber pool.
         </p>
       </div>
 

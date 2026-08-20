@@ -43,7 +43,7 @@ export default function AdminHomePage() {
         { label: "Volume processed", value: tokens(stats.totalVolume), hint: `${stats.tablesPlayed} completed tables` },
         { label: "Platform earnings (20%)", value: tokens(stats.totalEarnings), hint: "One stake per filled table" },
         { label: "Paid to winners (80%)", value: tokens(stats.totalDistributed), hint: "4× stake" },
-        { label: "Reward pool (10% of fees)", value: tokens(stats.rewardPoolBalance), hint: `${stats.month} jackpot` },
+        { label: "Reward pool (20% of fees)", value: tokens(stats.rewardPoolBalance), hint: `${stats.month} jackpot` },
       ]
     : [];
 
@@ -75,7 +75,7 @@ export default function AdminHomePage() {
         </div>
       )}
       <p className="mt-4 text-xs text-white/35">
-        Commission logged per table is 20% of the pot (equal to one player&apos;s stake). 10% of that
+        Commission logged per table is 20% of the pot (equal to one player&apos;s stake). 20% of that
         commission is routed into the monthly subscriber reward pool.
       </p>
     </AdminFrame>

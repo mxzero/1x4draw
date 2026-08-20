@@ -67,32 +67,35 @@ export async function GET() {
       take: 100,
     });
 
+    const lostSeats = await prisma.tablePlayer.findMany({
+      where: { userId: user.id, result: "LOST", joinedAt: { gte: since } },
+      include: { table: true },
+      orderBy: { joinedAt: "desc" },
+      take: 100,
+    });
+
+    const rows = [
+      ...ledger
+        .filter((row) => row.type === "DEPOSIT" || row.type === "WITHDRAW" || row.type === "WIN")
+        .map((row) => ({
+          id: row.id,
+          info: row.type === "DEPOSIT" ? "Bought" : row.type === "WITHDRAW" ? "Convert" : "Won",
+          amount: toNum(row.amount),
+          note: row.note,
+          createdAt: row.createdAt,
+        })),
+      ...lostSeats.map((row) => ({
+        id: `lost-${row.id}`,
+        info: "Lost",
+        amount: -row.table.betAmount,
+        note: row.table.name,
+        createdAt: row.table.completedAt ?? row.joinedAt,
+      })),
+    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
     return NextResponse.json({
       days: historyWindowDays(user.tier),
-      buy: ledger
-        .filter((row) => row.type === "DEPOSIT")
-        .map((row) => ({
-          id: row.id,
-          amount: toNum(row.amount),
-          note: row.note,
-          createdAt: row.createdAt,
-        })),
-      convert: ledger
-        .filter((row) => row.type === "WITHDRAW")
-        .map((row) => ({
-          id: row.id,
-          amount: toNum(row.amount),
-          note: row.note,
-          createdAt: row.createdAt,
-        })),
-      withdraw: ledger
-        .filter((row) => row.type === "WITHDRAW")
-        .map((row) => ({
-          id: row.id,
-          amount: toNum(row.amount),
-          note: row.note,
-          createdAt: row.createdAt,
-        })),
+      rows,
     });
   } catch (error) {
     return jsonError(error);

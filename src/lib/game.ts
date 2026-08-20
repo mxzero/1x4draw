@@ -1,6 +1,7 @@
 import { Prisma, Role, Tier, type User, type Wallet } from "@prisma/client";
 import { randomInt } from "crypto";
 import {
+  AUTO_JOIN_DELAY_MS,
   BASIC_DAILY_JOIN_LIMIT,
   BASIC_HISTORY_DAYS,
   COMMISSION_RATE,
@@ -54,6 +55,17 @@ async function withRetry<T>(fn: () => Promise<T>, attempts = 4): Promise<T> {
 async function assertCanJoin(tx: Tx, user: UserWithWallet, betAmount: number) {
   if (user.banned) throw new GameError("Account is banned", "BANNED", 403);
   if (!user.wallet) throw new GameError("Wallet is missing", "NO_WALLET", 500);
+
+  if (user.bot) {
+    if (toNum(user.wallet.balance) < betAmount) {
+      user.wallet = await tx.wallet.update({
+        where: { userId: user.id },
+        data: { balance: 5000 },
+      });
+    }
+    return;
+  }
+
   if (toNum(user.wallet.balance) < betAmount) {
     throw new GameError("Insufficient balance", "INSUFFICIENT_BALANCE");
   }
@@ -128,16 +140,18 @@ async function lockBet(tx: Tx, betAmount: number) {
 }
 
 async function findOrCreateOpenTable(tx: Tx, betAmount: number) {
-  const existing = await tx.gameTable.findFirst({
+  const open = await tx.gameTable.findMany({
     where: { betAmount, status: "OPEN" },
-    orderBy: { openedAt: "asc" },
+    include: { _count: { select: { players: true } } },
+    orderBy: { openedAt: "desc" },
   });
 
-  if (existing) {
-    const count = await tx.tablePlayer.count({ where: { tableId: existing.id } });
-    if (count < PLAYERS_PER_TABLE) return existing;
+  const lastOpen = open.find((table) => table._count.players < PLAYERS_PER_TABLE);
+  if (lastOpen) return lastOpen;
+
+  for (const table of open) {
     await tx.gameTable.update({
-      where: { id: existing.id },
+      where: { id: table.id },
       data: { status: "FULL" },
     });
   }
@@ -346,7 +360,7 @@ export async function joinBet(userId: string, betAmount: number) {
 
         const players = await tx.tablePlayer.findMany({
           where: { tableId: table.id },
-          include: { user: { select: { id: true, username: true } } },
+          include: { user: { select: { id: true, username: true, bot: true } } },
           orderBy: { joinedAt: "asc" },
         });
 
@@ -360,6 +374,7 @@ export async function joinBet(userId: string, betAmount: number) {
             : null;
 
         const beta = await isBetaMode(tx);
+        const firstHuman = players.find((p) => !p.user.bot);
         return {
           tableId: table.id,
           tableName: table.name,
@@ -367,7 +382,11 @@ export async function joinBet(userId: string, betAmount: number) {
           playerCount: players.length,
           seats: PLAYERS_PER_TABLE,
           players: players.map((p) => p.user.username),
-          autoFill: beta && !user.bot && players.length < PLAYERS_PER_TABLE,
+          autoFill:
+            beta &&
+            !user.bot &&
+            players.length < PLAYERS_PER_TABLE &&
+            firstHuman?.userId === user.id,
           draw,
         };
       },
@@ -488,6 +507,10 @@ export async function seatNextPlayer(requesterId: string, tableId: string) {
     throw new GameError("You are not seated at this table", "FORBIDDEN", 403);
   }
 
+  return seatNextBot(tableId);
+}
+
+export async function seatNextBot(tableId: string) {
   const result = await withRetry(() =>
     prisma.$transaction(async (tx) => {
       const table = await tx.gameTable.findUnique({ where: { id: tableId } });
@@ -503,6 +526,11 @@ export async function seatNextPlayer(requesterId: string, tableId: string) {
       });
       if (seated.length >= PLAYERS_PER_TABLE) {
         throw new GameError("Table is full", "FULL");
+      }
+
+      const newest = seated[seated.length - 1];
+      if (newest && Date.now() - newest.joinedAt.getTime() < AUTO_JOIN_DELAY_MS) {
+        throw new GameError("Auto-fill is waiting for the next seat", "TOO_SOON", 429);
       }
 
       const joined = await seatOneCandidate(
@@ -542,6 +570,43 @@ export async function seatNextPlayer(requesterId: string, tableId: string) {
 
   emitDraw(result);
   return result;
+}
+
+const fillingTables = new Set<string>();
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function continueTableFill(tableId: string) {
+  if (fillingTables.has(tableId)) return;
+  fillingTables.add(tableId);
+  try {
+    for (let i = 0; i < PLAYERS_PER_TABLE; i++) {
+      await sleep(AUTO_JOIN_DELAY_MS);
+      const table = await prisma.gameTable.findUnique({
+        where: { id: tableId },
+        include: {
+          players: { include: { user: { select: { bot: true } } } },
+        },
+      });
+      if (!table || table.status !== "OPEN") return;
+      if (table.players.length >= PLAYERS_PER_TABLE) return;
+      if (!table.players.some((player) => !player.user.bot)) return;
+
+      try {
+        const result = await seatNextBot(tableId);
+        if (result.draw || result.playerCount >= PLAYERS_PER_TABLE) return;
+      } catch (error) {
+        if (error instanceof GameError && (error.code === "TOO_SOON" || error.code === "NO_FILL")) {
+          continue;
+        }
+        return;
+      }
+    }
+  } finally {
+    fillingTables.delete(tableId);
+  }
 }
 
 export async function runMonthlyRaffle() {

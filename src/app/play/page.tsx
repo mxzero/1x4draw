@@ -1,15 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { AppFrame } from "@/components/app-frame";
 import { Button, Card } from "@/components/ui";
 import { useLive } from "@/hooks/use-live";
-import {
-  BASIC_DAILY_JOIN_LIMIT,
-  BETA_AUTO_JOIN_DELAY_MS,
-} from "@/lib/constants";
+import { BASIC_DAILY_JOIN_LIMIT } from "@/lib/constants";
 import { tokens } from "@/lib/utils";
 import type { AppEvent } from "@/lib/events";
 
@@ -25,6 +22,16 @@ type TierInfo = {
     players: string[];
     joined: boolean;
   } | null;
+};
+
+type JoinedTable = {
+  tableId: string;
+  tableName: string;
+  betAmount: number;
+  status: string;
+  seated: number;
+  seats: number;
+  players: string[];
 };
 
 type DrawToast = {
@@ -57,24 +64,22 @@ function SeatSquares({ players, seats = 5 }: { players: string[]; seats?: number
   );
 }
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 export default function PlayPage() {
   const { data: session } = useSession();
   const [tiers, setTiers] = useState<TierInfo[]>([]);
+  const [joinedTables, setJoinedTables] = useState<JoinedTable[]>([]);
   const [balance, setBalance] = useState(0);
   const [pool, setPool] = useState(0);
   const [dailyJoins, setDailyJoins] = useState(0);
   const [busy, setBusy] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [toast, setToast] = useState<DrawToast | null>(null);
-  const [joinedName, setJoinedName] = useState<string | null>(null);
-  const filling = useRef(false);
-  const fillToken = useRef(0);
+  const [focusStake, setFocusStake] = useState<number | null>(null);
 
   const isBasic = session?.user.tier === "BASIC";
+  const hasPending = joinedTables.some(
+    (t) => t.status === "OPEN" || t.status === "FULL" || t.status === "DRAWING",
+  );
 
   const refresh = useCallback(async () => {
     const [tablesRes, meRes, walletRes] = await Promise.all([
@@ -90,6 +95,7 @@ export default function PlayPage() {
       const data = await meRes.json();
       setBalance(data.balance);
       setDailyJoins(data.dailyJoins ?? 0);
+      setJoinedTables(data.tables ?? []);
     }
     if (walletRes.ok) {
       const data = await walletRes.json();
@@ -100,11 +106,16 @@ export default function PlayPage() {
 
   useEffect(() => {
     void refresh();
-    const id = setInterval(() => {
-      if (!filling.current) void refresh();
-    }, 4000);
-    return () => clearInterval(id);
-  }, [refresh]);
+    const id = setInterval(() => void refresh(), hasPending ? 1000 : 4000);
+    const onVis = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [refresh, hasPending]);
 
   const showDraw = useCallback(
     (event: {
@@ -130,7 +141,7 @@ export default function PlayPage() {
   useLive(
     useCallback(
       (event: AppEvent) => {
-        if (!filling.current) void refresh();
+        void refresh();
         if (event.type === "DRAW_COMPLETE") {
           showDraw({
             tableId: String(event.tableId),
@@ -146,59 +157,8 @@ export default function PlayPage() {
     ),
   );
 
-  async function runAutoFill(tableId: string, betAmount: number, tableName: string) {
-    filling.current = true;
-    const token = ++fillToken.current;
-    const delay = BETA_AUTO_JOIN_DELAY_MS;
-    try {
-      for (let i = 0; i < 4; i++) {
-        await sleep(delay);
-        if (token !== fillToken.current) return;
-        const res = await fetch("/api/tables/seat-next", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tableId }),
-        });
-        const data = await res.json();
-        if (token !== fillToken.current) return;
-        if (!res.ok) {
-          setError(data.error ?? "Auto-join stopped");
-          break;
-        }
-        setTiers((current) =>
-          current.map((tier) =>
-            tier.betAmount === betAmount
-              ? {
-                  ...tier,
-                  nextFill: {
-                    tableId: data.tableId,
-                    name: data.tableName,
-                    seated: data.playerCount,
-                    seats: data.seats,
-                    players: data.players,
-                    joined: true,
-                  },
-                }
-              : tier,
-          ),
-        );
-        if (data.draw) {
-          showDraw({ ...data.draw, tableName: data.tableName ?? tableName });
-          break;
-        }
-      }
-    } finally {
-      if (token === fillToken.current) {
-        filling.current = false;
-        await refresh();
-      }
-    }
-  }
-
   async function leave(tableId: string) {
     setError("");
-    fillToken.current += 1;
-    filling.current = false;
     const res = await fetch("/api/tables/leave", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -209,7 +169,6 @@ export default function PlayPage() {
       setError(data.error ?? "Could not leave");
       return;
     }
-    setJoinedName(null);
     await refresh();
   }
 
@@ -227,23 +186,27 @@ export default function PlayPage() {
       setError(data.error ?? "Could not join");
       return;
     }
-    setJoinedName(data.tableName);
     await refresh();
     if (data.draw) {
       showDraw({ ...data.draw, tableName: data.tableName });
-      return;
-    }
-    if (data.autoFill) {
-      await runAutoFill(data.tableId, betAmount, data.tableName);
     }
   }
+
+  function goToTable(betAmount: number) {
+    setFocusStake(betAmount);
+    document.getElementById(`stake-${betAmount}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  const activeJoined = joinedTables.filter(
+    (t) => t.status === "OPEN" || t.status === "FULL" || t.status === "DRAWING",
+  );
 
   return (
     <AppFrame balance={balance} pool={pool} onBalanceChange={() => void refresh()}>
       <p className="text-[11px] uppercase tracking-[0.3em] text-white/40">Play</p>
       <h1 className="font-display text-4xl">Select table</h1>
       <p className="mt-1 text-sm text-white/50">
-        One table per row. Fifth player triggers the draw. Winner is paid 4× in Tokens (1 Token = 1 PHP).
+        One table per row. You sit in the next empty seat on the latest open table. Fifth player triggers the draw.
       </p>
       {isBasic && (
         <p className="mt-3 rounded-[5px] border border-sand/30 bg-sand/10 px-3 py-2 text-xs text-sand">
@@ -254,12 +217,21 @@ export default function PlayPage() {
           to increase.
         </p>
       )}
-      <p className="mt-3 rounded-[5px] border border-teal/30 bg-teal/10 px-3 py-2 text-xs text-white/70">
-        Beta: bots fill remaining seats 0.5s after you join.
-      </p>
-      {joinedName && (
+      {activeJoined.length > 0 && (
         <p className="mt-3 rounded-[5px] border border-white/10 bg-surface px-3 py-2 text-sm">
-          Joined <span className="text-sand">{joinedName}</span>
+          Joined{" "}
+          {activeJoined.map((table, i) => (
+            <span key={table.tableId}>
+              {i > 0 && ", "}
+              <button
+                type="button"
+                className="text-sand underline decoration-sand/40 underline-offset-2"
+                onClick={() => goToTable(table.betAmount)}
+              >
+                {table.tableName}
+              </button>
+            </span>
+          ))}
         </p>
       )}
 
@@ -270,8 +242,11 @@ export default function PlayPage() {
           const players = tier.nextFill?.players ?? [];
           const seatedHere = Boolean(tier.nextFill?.joined);
           return (
-            <Card key={tier.betAmount} className="space-y-3">
-              <div className="flex items-start justify-between gap-3">
+            <Card
+              key={tier.betAmount}
+              className={`space-y-3 ${focusStake === tier.betAmount ? "ring-1 ring-sand" : ""}`}
+            >
+              <div id={`stake-${tier.betAmount}`} className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-display text-[25px] leading-none text-sand">{tokens(tier.betAmount)}</p>
                   <p className="mt-1 text-xs text-white/40">

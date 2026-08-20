@@ -28,11 +28,11 @@ Create a new account from the home page, or sign in as admin:
 | New user | Register | Basic, 5,000 Tokens, not a bot |
 | Table bots | Seeded automatically | Random 6–10 character alphanumeric names, `bot: true` |
 
-Beta mode seats bots into empty chairs 0.5s after a real player joins.
+Beta mode seats bots into empty chairs 1s after a real player joins. The fill continues on the server if you leave the tab.
 
 ## Rules
 
 - Stakes: 5 / 10 / 20 / 50 / 100 Tokens
 - Basic: 10 table joins per day (subscribe to increase)
 - Subscribe: $1.99 / month or $10.99 / year (credit card required)
-- Winner 4×, 20% table fee, 10% of that fee → monthly subscriber pool
+- Winner 4×, 20% table fee, 20% of that fee → monthly subscriber pool

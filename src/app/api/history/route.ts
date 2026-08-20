@@ -1,6 +1,7 @@
+import { after } from "next/server";
 import { NextResponse } from "next/server";
 import { jsonError, requireSession } from "@/lib/api";
-import { historyWindowDays } from "@/lib/game";
+import { continueTableFill, historyWindowDays } from "@/lib/game";
 import { prisma } from "@/lib/prisma";
 import { toNum } from "@/lib/utils";
 
@@ -32,6 +33,12 @@ export async function GET(request: Request) {
       take: 200,
     });
 
+    for (const row of rows) {
+      if (row.result === "PENDING" && row.table.status === "OPEN") {
+        after(() => continueTableFill(row.tableId));
+      }
+    }
+
     const items = rows.map((row) => {
       const bet = row.table.betAmount;
       const payout = toNum(row.payout);
@@ -45,6 +52,7 @@ export async function GET(request: Request) {
         net,
         joinedAt: row.joinedAt,
         completedAt: row.table.completedAt,
+        canLeave: row.result === "PENDING" && row.table.status === "OPEN",
       };
     });
 

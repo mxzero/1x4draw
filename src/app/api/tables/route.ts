@@ -1,6 +1,8 @@
+import { after } from "next/server";
 import { NextResponse } from "next/server";
 import { BET_VALUES, PLAYERS_PER_TABLE } from "@/lib/constants";
 import { jsonError, requireSession } from "@/lib/api";
+import { continueTableFill } from "@/lib/game";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -14,29 +16,36 @@ export async function GET() {
       include: {
         _count: { select: { players: true } },
         players: {
-          include: { user: { select: { username: true } } },
+          include: { user: { select: { username: true, bot: true } } },
           orderBy: { joinedAt: "asc" },
         },
       },
-      orderBy: { openedAt: "asc" },
+      orderBy: { openedAt: "desc" },
     });
+
+    for (const table of open) {
+      if (table.players.some((p) => p.userId === user.id) && table._count.players < PLAYERS_PER_TABLE) {
+        after(() => continueTableFill(table.id));
+      }
+    }
 
     const tiers = BET_VALUES.map((betAmount) => {
       const tables = open.filter((t) => t.betAmount === betAmount);
       const waiting = tables.reduce((sum, t) => sum + t._count.players, 0);
-      const first = tables[0];
+      const mine = tables.find((t) => t.players.some((p) => p.userId === user.id));
+      const shown = mine ?? tables[0];
       return {
         betAmount,
         openTables: tables.length,
         waitingPlayers: waiting,
-        nextFill: first
+        nextFill: shown
           ? {
-              tableId: first.id,
-              name: first.name,
-              seated: first._count.players,
+              tableId: shown.id,
+              name: shown.name,
+              seated: shown._count.players,
               seats: PLAYERS_PER_TABLE,
-              players: first.players.map((p) => p.user.username),
-              joined: first.players.some((p) => p.userId === user.id),
+              players: shown.players.map((p) => p.user.username),
+              joined: shown.players.some((p) => p.userId === user.id),
             }
           : null,
       };
