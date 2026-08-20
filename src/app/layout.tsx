@@ -21,6 +21,8 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: "1X4", statusBarStyle: "black-translucent" },
 };
 
+export const preferredRegion = ["sin1"];
+
 export const viewport: Viewport = {
   themeColor: "#000000",
   width: "device-width",

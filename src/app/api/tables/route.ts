@@ -1,8 +1,6 @@
-import { after } from "next/server";
 import { NextResponse } from "next/server";
 import { BET_VALUES, PLAYERS_PER_TABLE } from "@/lib/constants";
 import { jsonError, requireSession } from "@/lib/api";
-import { continueTableFill } from "@/lib/game";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -23,17 +21,11 @@ export async function GET() {
       orderBy: { openedAt: "desc" },
     });
 
-    for (const table of open) {
-      if (table.players.some((p) => p.userId === user.id) && table._count.players < PLAYERS_PER_TABLE) {
-        after(() => continueTableFill(table.id));
-      }
-    }
-
     const tiers = BET_VALUES.map((betAmount) => {
       const tables = open.filter((t) => t.betAmount === betAmount);
       const waiting = tables.reduce((sum, t) => sum + t._count.players, 0);
       const mine = tables.find((t) => t.players.some((p) => p.userId === user.id));
-      const shown = mine ?? tables[0];
+      const shown = mine ?? tables.find((t) => t.players.some((p) => !p.user.bot)) ?? tables[0];
       return {
         betAmount,
         openTables: tables.length,

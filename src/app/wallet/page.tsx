@@ -7,7 +7,7 @@ import { Badge, Button, Card } from "@/components/ui";
 import { useLive } from "@/hooks/use-live";
 import { formatWhen, tokens } from "@/lib/utils";
 
-type Row = { id: string; info: string; amount: number; note: string | null; createdAt: string };
+type Row = { id: string; info: string; amount: number; tickets?: number; note: string | null; createdAt: string };
 
 function infoTone(info: string): "win" | "lost" | "pending" | "neutral" {
   if (info === "Won" || info === "Bought") return "win";
@@ -19,6 +19,7 @@ export default function WalletPage() {
   const [balance, setBalance] = useState(0);
   const [pool, setPool] = useState(0);
   const [days, setDays] = useState(7);
+  const [tickets, setTickets] = useState(0);
   const [rows, setRows] = useState<Row[]>([]);
   const [modal, setModal] = useState<"gcash" | "withdraw" | null>(null);
   const [withdrawError, setWithdrawError] = useState("");
@@ -34,6 +35,7 @@ export default function WalletPage() {
     if (tokenHist.ok) {
       const data = await tokenHist.json();
       setDays(data.days);
+      setTickets(data.tickets ?? 0);
       setRows(data.rows ?? []);
     }
   }, []);
@@ -71,6 +73,8 @@ export default function WalletPage() {
       <Card className="mt-5">
         <p className="text-[11px] uppercase tracking-widest text-white/40">Available</p>
         <p className="font-display text-5xl text-sand">{tokens(balance)}</p>
+        <p className="mt-3 text-[11px] uppercase tracking-widest text-white/40">Raffle tickets</p>
+        <p className="font-display text-3xl text-sand">{tickets}</p>
         <div className="mt-4 space-y-2">
           <Button variant="ghost" className="w-full" onClick={() => setModal("gcash")}>
             GCash
@@ -92,13 +96,14 @@ export default function WalletPage() {
             <tr>
               <th className="px-3 py-2 font-medium">When</th>
               <th className="px-3 py-2 font-medium">Info</th>
+              <th className="px-3 py-2 font-medium text-right">Tickets</th>
               <th className="px-3 py-2 font-medium text-right">Amount</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-3 py-4 text-white/40">
+                <td colSpan={4} className="px-3 py-4 text-white/40">
                   No wallet activity in this window.
                 </td>
               </tr>
@@ -109,6 +114,7 @@ export default function WalletPage() {
                 <td className="px-3 py-2.5">
                   <Badge tone={infoTone(row.info)}>{row.info}</Badge>
                 </td>
+                <td className="px-3 py-2.5 text-right text-white/70">{row.tickets ?? 0}</td>
                 <td
                   className={`px-3 py-2.5 text-right ${
                     row.amount >= 0 ? "text-[#d5e07a]" : "text-[#f0a8a3]"

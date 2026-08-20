@@ -71,6 +71,7 @@ model User {
   notifications   Notification[]
   gcashTxns       GCashTransaction[]
   rewardWins      RewardDrawWinner[]
+  raffleEntries   RaffleEntry[]
   reviewedGcash   GCashTransaction[] @relation("GCashReviewer")
 
   @@index([email])
@@ -107,6 +108,7 @@ model GameTable {
   players     TablePlayer[]
   draw        Draw?
   commission  CommissionLog?
+  raffleEntries RaffleEntry[]
 
   @@index([betAmount, status, openedAt])
   @@index([status])
@@ -232,5 +234,18 @@ model AppStatus {
   id        String   @id @default("global")
   mode      String   @default("beta")
   updatedAt DateTime @updatedAt
+}
+
+model RaffleEntry {
+  id        String    @id @default(cuid())
+  userId    String
+  tableId   String
+  tickets   Int
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  table     GameTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tableId])
+  @@index([userId])
 }
 

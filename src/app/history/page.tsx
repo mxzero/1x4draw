@@ -17,6 +17,7 @@ type Item = {
   joinedAt: string;
   completedAt: string | null;
   canLeave?: boolean;
+  tickets?: number;
 };
 
 const FILTERS = ["ALL", "PENDING", "WON", "LOST"] as const;
@@ -138,7 +139,12 @@ export default function HistoryPage() {
               </div>
             </div>
             <div className="mt-3 flex justify-between text-sm">
-              <span className="text-white/45">Payout {tokens(item.payout)}</span>
+              <span className="text-white/45">
+                Payout {tokens(item.payout)}
+                {item.status !== "PENDING" && (
+                  <> · Tickets {item.tickets ?? 0}</>
+                )}
+              </span>
               <span className={item.net > 0 ? "text-[#d5e07a]" : item.net < 0 ? "text-[#f0a8a3]" : "text-white/50"}>
                 Net {item.status === "PENDING" ? "—" : tokens(item.net)}
               </span>

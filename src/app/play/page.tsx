@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { AppFrame } from "@/components/app-frame";
 import { Button, Card } from "@/components/ui";
 import { useLive } from "@/hooks/use-live";
-import { BASIC_DAILY_JOIN_LIMIT } from "@/lib/constants";
+import { AUTO_JOIN_DELAY_MS, BASIC_DAILY_JOIN_LIMIT } from "@/lib/constants";
 import { tokens } from "@/lib/utils";
 import type { AppEvent } from "@/lib/events";
 
@@ -75,18 +75,40 @@ export default function PlayPage() {
   const [error, setError] = useState("");
   const [toast, setToast] = useState<DrawToast | null>(null);
   const [focusStake, setFocusStake] = useState<number | null>(null);
+  const shownDraws = useRef(new Set<string>());
+  const watchedTables = useRef(new Set<string>());
+  const leftTables = useRef(new Set<string>());
 
   const isBasic = session?.user.tier === "BASIC";
   const hasPending = joinedTables.some(
     (t) => t.status === "OPEN" || t.status === "FULL" || t.status === "DRAWING",
   );
 
+  const showDraw = useCallback(
+    (event: {
+      tableId: string;
+      tableName?: string;
+      winnerName: string;
+      winnerPayout: number;
+      betAmount: number;
+      winnerId?: string;
+      youWon?: boolean;
+    }) => {
+      shownDraws.current.add(event.tableId);
+      setToast({
+        tableId: event.tableId,
+        tableName: event.tableName ?? "Table",
+        winnerName: event.winnerName,
+        winnerPayout: event.winnerPayout,
+        betAmount: event.betAmount,
+        youWon: event.youWon === true || event.winnerId === session?.user.id,
+      });
+    },
+    [session?.user.id],
+  );
+
   const refresh = useCallback(async () => {
-    const [tablesRes, meRes, walletRes] = await Promise.all([
-      fetch("/api/tables"),
-      fetch("/api/me"),
-      fetch("/api/wallet"),
-    ]);
+    const [tablesRes, meRes] = await Promise.all([fetch("/api/tables"), fetch("/api/me")]);
     if (tablesRes.ok) {
       const data = await tablesRes.json();
       setTiers(data.tiers);
@@ -96,13 +118,18 @@ export default function PlayPage() {
       setBalance(data.balance);
       setDailyJoins(data.dailyJoins ?? 0);
       setJoinedTables(data.tables ?? []);
+      if (typeof data.pool === "number") setPool(data.pool);
+      for (const table of data.tables ?? []) {
+        watchedTables.current.add(table.tableId);
+      }
+      for (const draw of data.recentDraws ?? []) {
+        if (shownDraws.current.has(draw.tableId)) continue;
+        if (leftTables.current.has(draw.tableId)) continue;
+        if (!watchedTables.current.has(draw.tableId)) continue;
+        showDraw(draw);
+      }
     }
-    if (walletRes.ok) {
-      const data = await walletRes.json();
-      setPool(data.rewardPool.balance);
-      setBalance(data.balance);
-    }
-  }, []);
+  }, [showDraw]);
 
   useEffect(() => {
     void refresh();
@@ -116,27 +143,6 @@ export default function PlayPage() {
       document.removeEventListener("visibilitychange", onVis);
     };
   }, [refresh, hasPending]);
-
-  const showDraw = useCallback(
-    (event: {
-      tableId: string;
-      tableName?: string;
-      winnerName: string;
-      winnerPayout: number;
-      betAmount: number;
-      winnerId?: string;
-    }) => {
-      setToast({
-        tableId: event.tableId,
-        tableName: event.tableName ?? "Table",
-        winnerName: event.winnerName,
-        winnerPayout: event.winnerPayout,
-        betAmount: event.betAmount,
-        youWon: event.winnerId === session?.user.id,
-      });
-    },
-    [session?.user.id],
-  );
 
   useLive(
     useCallback(
@@ -159,6 +165,7 @@ export default function PlayPage() {
 
   async function leave(tableId: string) {
     setError("");
+    leftTables.current.add(tableId);
     const res = await fetch("/api/tables/leave", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -186,11 +193,45 @@ export default function PlayPage() {
       setError(data.error ?? "Could not join");
       return;
     }
+    if (data.tableId) watchedTables.current.add(data.tableId);
     await refresh();
     if (data.draw) {
       showDraw({ ...data.draw, tableName: data.tableName });
     }
   }
+
+  const fillKey = joinedTables
+    .filter((t) => t.status === "OPEN" && t.seated < t.seats)
+    .map((t) => t.tableId)
+    .sort()
+    .join(",");
+
+  useEffect(() => {
+    if (!fillKey) return;
+    const ids = fillKey.split(",");
+    let stopped = false;
+    const id = setInterval(() => {
+      void (async () => {
+        for (const tableId of ids) {
+          if (stopped) return;
+          const res = await fetch("/api/tables/seat-next", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tableId }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (res.ok && data.draw) {
+            showDraw({ ...data.draw, tableName: data.tableName });
+          }
+        }
+        if (!stopped) await refresh();
+      })();
+    }, AUTO_JOIN_DELAY_MS);
+    return () => {
+      stopped = true;
+      clearInterval(id);
+    };
+  }, [fillKey, refresh, showDraw]);
 
   function goToTable(betAmount: number) {
     setFocusStake(betAmount);

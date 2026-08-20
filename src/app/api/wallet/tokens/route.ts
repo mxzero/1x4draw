@@ -61,18 +61,29 @@ export async function GET() {
     const since = new Date();
     since.setUTCDate(since.getUTCDate() - historyWindowDays(user.tier));
 
-    const ledger = await prisma.walletLedger.findMany({
-      where: { userId: user.id, createdAt: { gte: since } },
-      orderBy: { createdAt: "desc" },
-      take: 100,
-    });
+    const [ledger, lostSeats, entries, ticketAgg] = await Promise.all([
+      prisma.walletLedger.findMany({
+        where: { userId: user.id, createdAt: { gte: since } },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      }),
+      prisma.tablePlayer.findMany({
+        where: { userId: user.id, result: "LOST", joinedAt: { gte: since } },
+        include: { table: true },
+        orderBy: { joinedAt: "desc" },
+        take: 100,
+      }),
+      prisma.raffleEntry.findMany({
+        where: { userId: user.id, createdAt: { gte: since } },
+        select: { tableId: true, tickets: true },
+      }),
+      prisma.raffleEntry.aggregate({
+        where: { userId: user.id },
+        _sum: { tickets: true },
+      }),
+    ]);
 
-    const lostSeats = await prisma.tablePlayer.findMany({
-      where: { userId: user.id, result: "LOST", joinedAt: { gte: since } },
-      include: { table: true },
-      orderBy: { joinedAt: "desc" },
-      take: 100,
-    });
+    const ticketsByTable = new Map(entries.map((row) => [row.tableId, row.tickets]));
 
     const rows = [
       ...ledger
@@ -81,6 +92,7 @@ export async function GET() {
           id: row.id,
           info: row.type === "DEPOSIT" ? "Bought" : row.type === "WITHDRAW" ? "Convert" : "Won",
           amount: toNum(row.amount),
+          tickets: 0,
           note: row.note,
           createdAt: row.createdAt,
         })),
@@ -88,6 +100,7 @@ export async function GET() {
         id: `lost-${row.id}`,
         info: "Lost",
         amount: -row.table.betAmount,
+        tickets: ticketsByTable.get(row.tableId) ?? 0,
         note: row.table.name,
         createdAt: row.table.completedAt ?? row.joinedAt,
       })),
@@ -95,6 +108,7 @@ export async function GET() {
 
     return NextResponse.json({
       days: historyWindowDays(user.tier),
+      tickets: ticketAgg._sum.tickets ?? 0,
       rows,
     });
   } catch (error) {

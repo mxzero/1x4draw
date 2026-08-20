@@ -13,6 +13,7 @@ import {
   PREMIUM_DAILY_SPEND_CAP,
   PREMIUM_HISTORY_DAYS,
   REWARD_POOL_SHARE_OF_COMMISSION,
+  ticketsForLoss,
   utcToday,
   WINNER_MULTIPLIER,
 } from "@/lib/constants";
@@ -142,11 +143,17 @@ async function lockBet(tx: Tx, betAmount: number) {
 async function findOrCreateOpenTable(tx: Tx, betAmount: number) {
   const open = await tx.gameTable.findMany({
     where: { betAmount, status: "OPEN" },
-    include: { _count: { select: { players: true } } },
+    include: {
+      _count: { select: { players: true } },
+      players: { include: { user: { select: { bot: true } } } },
+    },
     orderBy: { openedAt: "desc" },
   });
 
-  const lastOpen = open.find((table) => table._count.players < PLAYERS_PER_TABLE);
+  const lastOpen = open.find(
+    (table) =>
+      table._count.players < PLAYERS_PER_TABLE && table.players.some((player) => !player.user.bot),
+  );
   if (lastOpen) return lastOpen;
 
   for (const table of open) {
@@ -226,7 +233,7 @@ async function seatOneCandidate(tx: Tx, tableId: string, betAmount: number, tabl
   return null;
 }
 
-type Seated = { id: string; userId: string; user: { id: string; username: string } };
+type Seated = { id: string; userId: string; user: { id: string; username: string; bot?: boolean } };
 
 async function completeDraw(tx: Tx, tableId: string, tableName: string, betAmount: number, players: Seated[]) {
   if (players.length !== PLAYERS_PER_TABLE) {
@@ -305,6 +312,20 @@ async function completeDraw(tx: Tx, tableId: string, tableName: string, betAmoun
     where: { id: tableId },
     data: { status: "COMPLETED", completedAt: new Date() },
   });
+
+  const lossTickets = ticketsForLoss(betAmount);
+  if (lossTickets > 0) {
+    await tx.raffleEntry.createMany({
+      data: players
+        .filter((player) => player.userId !== winner.userId && !player.user.bot)
+        .map((player) => ({
+          userId: player.userId,
+          tableId,
+          tickets: lossTickets,
+        })),
+      skipDuplicates: true,
+    });
+  }
 
   await tx.notification.createMany({
     data: players.map((player) => {
@@ -521,11 +542,14 @@ export async function seatNextBot(tableId: string) {
 
       const seated = await tx.tablePlayer.findMany({
         where: { tableId },
-        include: { user: { select: { id: true, username: true } } },
+        include: { user: { select: { id: true, username: true, bot: true } } },
         orderBy: { joinedAt: "asc" },
       });
       if (seated.length >= PLAYERS_PER_TABLE) {
         throw new GameError("Table is full", "FULL");
+      }
+      if (!seated.some((player) => !player.user.bot)) {
+        throw new GameError("Bots only join tables started by a player", "NO_HUMAN");
       }
 
       const newest = seated[seated.length - 1];
@@ -546,7 +570,7 @@ export async function seatNextBot(tableId: string) {
 
       const players = await tx.tablePlayer.findMany({
         where: { tableId },
-        include: { user: { select: { id: true, username: true } } },
+        include: { user: { select: { id: true, username: true, bot: true } } },
         orderBy: { joinedAt: "asc" },
       });
 

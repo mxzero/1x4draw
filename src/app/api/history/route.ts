@@ -1,7 +1,6 @@
-import { after } from "next/server";
 import { NextResponse } from "next/server";
 import { jsonError, requireSession } from "@/lib/api";
-import { continueTableFill, historyWindowDays } from "@/lib/game";
+import { historyWindowDays } from "@/lib/game";
 import { prisma } from "@/lib/prisma";
 import { toNum } from "@/lib/utils";
 
@@ -16,28 +15,30 @@ export async function GET(request: Request) {
     const since = new Date();
     since.setUTCDate(since.getUTCDate() - historyWindowDays(user.tier));
 
-    const rows = await prisma.tablePlayer.findMany({
-      where: {
-        userId: user.id,
-        joinedAt: { gte: since },
-        ...(status === "PENDING" || status === "WON" || status === "LOST"
-          ? { result: status }
-          : {}),
-      },
-      include: {
-        table: {
-          include: { draw: true },
+    const [rows, entries] = await Promise.all([
+      prisma.tablePlayer.findMany({
+        where: {
+          userId: user.id,
+          joinedAt: { gte: since },
+          ...(status === "PENDING" || status === "WON" || status === "LOST"
+            ? { result: status }
+            : {}),
         },
-      },
-      orderBy: { joinedAt: "desc" },
-      take: 200,
-    });
+        include: {
+          table: {
+            include: { draw: true },
+          },
+        },
+        orderBy: { joinedAt: "desc" },
+        take: 200,
+      }),
+      prisma.raffleEntry.findMany({
+        where: { userId: user.id, createdAt: { gte: since } },
+        select: { tableId: true, tickets: true },
+      }),
+    ]);
 
-    for (const row of rows) {
-      if (row.result === "PENDING" && row.table.status === "OPEN") {
-        after(() => continueTableFill(row.tableId));
-      }
-    }
+    const ticketsByTable = new Map(entries.map((row) => [row.tableId, row.tickets]));
 
     const items = rows.map((row) => {
       const bet = row.table.betAmount;
@@ -50,6 +51,7 @@ export async function GET(request: Request) {
         status: row.result,
         payout,
         net,
+        tickets: ticketsByTable.get(row.tableId) ?? 0,
         joinedAt: row.joinedAt,
         completedAt: row.table.completedAt,
         canLeave: row.result === "PENDING" && row.table.status === "OPEN",

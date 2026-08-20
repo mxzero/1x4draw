@@ -17,6 +17,11 @@ export const SUBSCRIBE_MONTHLY_USD = 1.99;
 export const SUBSCRIBE_YEARLY_USD = 10.99;
 export const AUTO_JOIN_DELAY_MS = 1000;
 export const BETA_AUTO_JOIN_DELAY_MS = 1000;
+export const TICKET_TOKEN_UNIT = 10;
+
+export function ticketsForLoss(betAmount: number) {
+  return Math.floor(betAmount / TICKET_TOKEN_UNIT);
+}
 
 export function isBetValue(value: number): value is BetValue {
   return (BET_VALUES as readonly number[]).includes(value);

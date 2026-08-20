@@ -12,18 +12,25 @@ export async function GET() {
     const user = await requireSession();
     const since = new Date();
     since.setUTCDate(since.getUTCDate() - historyWindowDays(user.tier));
-    const wallet = await prisma.wallet.findUnique({ where: { userId: user.id } });
-    const ledger = await prisma.walletLedger.findMany({
-      where: { userId: user.id, createdAt: { gte: since } },
-      orderBy: { createdAt: "desc" },
-      take: 40,
-    });
-    const pool = await prisma.rewardPool.findUnique({
-      where: { month: currentMonthKey() },
-    });
+    const [wallet, ledger, pool, ticketAgg] = await Promise.all([
+      prisma.wallet.findUnique({ where: { userId: user.id } }),
+      prisma.walletLedger.findMany({
+        where: { userId: user.id, createdAt: { gte: since } },
+        orderBy: { createdAt: "desc" },
+        take: 40,
+      }),
+      prisma.rewardPool.findUnique({
+        where: { month: currentMonthKey() },
+      }),
+      prisma.raffleEntry.aggregate({
+        where: { userId: user.id },
+        _sum: { tickets: true },
+      }),
+    ]);
 
     return NextResponse.json({
       balance: toNum(wallet?.balance),
+      tickets: ticketAgg._sum.tickets ?? 0,
       gcashEnabled: GCASH_ENABLED,
       rewardPool: {
         month: currentMonthKey(),
