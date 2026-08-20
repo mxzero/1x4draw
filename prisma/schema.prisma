@@ -1,0 +1,228 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Tier {
+  BASIC
+  PREMIUM
+}
+
+enum TableStatus {
+  OPEN
+  FULL
+  DRAWING
+  COMPLETED
+}
+
+enum PlayerResult {
+  PENDING
+  WON
+  LOST
+}
+
+enum LedgerType {
+  BET
+  WIN
+  DEPOSIT
+  WITHDRAW
+  REWARD
+  ADJUSTMENT
+}
+
+enum GCashType {
+  DEPOSIT
+  WITHDRAW
+}
+
+enum GCashStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  email     String   @unique
+  password  String
+  role      Role     @default(USER)
+  tier      Tier     @default(BASIC)
+  banned              Boolean  @default(false)
+  subscriptionPlan    String?
+  subscribedAt        DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  wallet          Wallet?
+  dailyJoins      DailyJoinStat[]
+  tablePlayers    TablePlayer[]
+  ledger          WalletLedger[]
+  notifications   Notification[]
+  gcashTxns       GCashTransaction[]
+  rewardWins      RewardDrawWinner[]
+  reviewedGcash   GCashTransaction[] @relation("GCashReviewer")
+
+  @@index([email])
+  @@index([username])
+}
+
+model Wallet {
+  id        String  @id @default(cuid())
+  userId    String  @unique
+  balance   Decimal @default(0)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  updatedAt DateTime @updatedAt
+}
+
+model DailyJoinStat {
+  id     String   @id @default(cuid())
+  userId String
+  date   DateTime
+  count  Int      @default(0)
+  spend  Decimal  @default(0)
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+}
+
+model GameTable {
+  id          String      @id @default(cuid())
+  name        String      @default("")
+  betAmount   Int
+  status      TableStatus @default(OPEN)
+  openedAt    DateTime    @default(now())
+  filledAt    DateTime?
+  completedAt DateTime?
+  players     TablePlayer[]
+  draw        Draw?
+  commission  CommissionLog?
+
+  @@index([betAmount, status, openedAt])
+  @@index([status])
+}
+
+model TablePlayer {
+  id       String       @id @default(cuid())
+  tableId  String
+  userId   String
+  joinedAt DateTime     @default(now())
+  result   PlayerResult @default(PENDING)
+  payout   Decimal      @default(0)
+  table    GameTable    @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tableId, userId])
+  @@index([userId, result])
+}
+
+model Draw {
+  id           String   @id @default(cuid())
+  tableId      String   @unique
+  winnerId     String
+  betAmount    Int
+  winnerPayout Decimal
+  commission   Decimal
+  rewardShare  Decimal
+  drawnAt      DateTime @default(now())
+  table        GameTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+}
+
+model CommissionLog {
+  id          String    @id @default(cuid())
+  tableId     String    @unique
+  amount      Decimal
+  rewardShare Decimal
+  createdAt   DateTime  @default(now())
+  table       GameTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+}
+
+model RewardPool {
+  id              String   @id @default(cuid())
+  month           String   @unique
+  totalCommission Decimal  @default(0)
+  raffleIn        Decimal  @default(0)
+  raffleOut       Decimal  @default(0)
+  balance         Decimal  @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  draws           RewardDraw[]
+}
+
+model RewardDraw {
+  id          String             @id @default(cuid())
+  poolId      String
+  drawnAt     DateTime           @default(now())
+  totalAmount Decimal
+  winnerCount Int
+  pool        RewardPool         @relation(fields: [poolId], references: [id], onDelete: Cascade)
+  winners     RewardDrawWinner[]
+}
+
+model RewardDrawWinner {
+  id       String     @id @default(cuid())
+  drawId   String
+  userId   String
+  amount   Decimal
+  draw     RewardDraw @relation(fields: [drawId], references: [id], onDelete: Cascade)
+  user     User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model WalletLedger {
+  id           String     @id @default(cuid())
+  userId       String
+  type         LedgerType
+  amount       Decimal
+  balanceAfter Decimal
+  note         String?
+  createdAt    DateTime   @default(now())
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model GCashTransaction {
+  id         String      @id @default(cuid())
+  userId     String
+  type       GCashType
+  amount     Decimal
+  status     GCashStatus @default(PENDING)
+  reference  String?
+  notes      String?
+  createdAt  DateTime    @default(now())
+  reviewedAt DateTime?
+  reviewedBy String?
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewer   User?       @relation("GCashReviewer", fields: [reviewedBy], references: [id])
+}
+
+model BetLock {
+  betAmount Int      @id
+  updatedAt DateTime @updatedAt
+}
+
+model SystemLock {
+  id        String   @id
+  updatedAt DateTime @updatedAt
+}
