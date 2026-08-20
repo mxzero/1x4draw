@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { AppFrame } from "@/components/app-frame";
-import { Badge, Button, Card } from "@/components/ui";
+import { Button, Card } from "@/components/ui";
 import { useLive } from "@/hooks/use-live";
 import {
   AUTO_JOIN_DELAY_100_MS,
