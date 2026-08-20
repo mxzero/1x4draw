@@ -32,6 +32,7 @@ export async function GET() {
         username: true,
         email: true,
         tier: true,
+        bot: true,
         createdAt: true,
         subscribedAt: true,
         subscriptionPlan: true,

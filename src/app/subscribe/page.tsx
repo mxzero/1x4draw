@@ -69,7 +69,7 @@ export default function SubscribePage() {
         <button
           type="button"
           onClick={() => setPlan("monthly")}
-          className={`rounded-2xl border p-4 text-left ${plan === "monthly" ? "border-sand bg-sand/10" : "border-white/10 bg-surface"}`}
+          className={`rounded-[5px] border p-4 text-left ${plan === "monthly" ? "border-sand bg-sand/10" : "border-white/10 bg-surface"}`}
         >
           <p className="text-[11px] uppercase tracking-widest text-white/40">Monthly</p>
           <p className="font-display text-3xl text-sand">${SUBSCRIBE_MONTHLY_USD.toFixed(2)}</p>
@@ -78,7 +78,7 @@ export default function SubscribePage() {
         <button
           type="button"
           onClick={() => setPlan("yearly")}
-          className={`rounded-2xl border p-4 text-left ${plan === "yearly" ? "border-sand bg-sand/10" : "border-white/10 bg-surface"}`}
+          className={`rounded-[5px] border p-4 text-left ${plan === "yearly" ? "border-sand bg-sand/10" : "border-white/10 bg-surface"}`}
         >
           <p className="text-[11px] uppercase tracking-widest text-white/40">Yearly</p>
           <p className="font-display text-3xl text-sand">${SUBSCRIBE_YEARLY_USD.toFixed(2)}</p>
@@ -93,7 +93,7 @@ export default function SubscribePage() {
             <input
               name="cardName"
               required
-              className="mt-2 w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-sm outline-none focus:border-sand"
+              className="mt-2 w-full rounded-[5px] border border-white/10 bg-black px-4 py-3 text-sm outline-none focus:border-sand"
             />
           </label>
           <label className="block text-xs uppercase tracking-widest text-white/40">
@@ -103,7 +103,7 @@ export default function SubscribePage() {
               required
               inputMode="numeric"
               placeholder="4242 4242 4242 4242"
-              className="mt-2 w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-sm outline-none focus:border-sand"
+              className="mt-2 w-full rounded-[5px] border border-white/10 bg-black px-4 py-3 text-sm outline-none focus:border-sand"
             />
           </label>
           <div className="grid grid-cols-2 gap-3">
@@ -113,7 +113,7 @@ export default function SubscribePage() {
                 name="expiry"
                 required
                 placeholder="MM/YY"
-                className="mt-2 w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-sm outline-none focus:border-sand"
+                className="mt-2 w-full rounded-[5px] border border-white/10 bg-black px-4 py-3 text-sm outline-none focus:border-sand"
               />
             </label>
             <label className="block text-xs uppercase tracking-widest text-white/40">
@@ -123,7 +123,7 @@ export default function SubscribePage() {
                 required
                 inputMode="numeric"
                 placeholder="123"
-                className="mt-2 w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-sm outline-none focus:border-sand"
+                className="mt-2 w-full rounded-[5px] border border-white/10 bg-black px-4 py-3 text-sm outline-none focus:border-sand"
               />
             </label>
           </div>

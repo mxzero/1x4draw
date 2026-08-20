@@ -47,7 +47,7 @@ export default function HistoryPage() {
   useLive(useCallback(() => void load(), [load]));
 
   return (
-    <AppFrame balance={balance} pool={pool}>
+    <AppFrame balance={balance} pool={pool} onBalanceChange={() => void load()}>
       <h1 className="font-display text-4xl">Bet history</h1>
       <p className="text-sm text-white/45">Last {days} days for your tier.</p>
 
@@ -56,7 +56,7 @@ export default function HistoryPage() {
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`rounded-full px-3 py-1 text-xs uppercase tracking-wider ${
+            className={`rounded-[5px] px-3 py-1 text-xs uppercase tracking-wider ${
               filter === f ? "bg-sand text-black" : "bg-white/5 text-white/50"
             }`}
           >

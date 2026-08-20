@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { jsonError, requireSession } from "@/lib/api";
 import { currentMonthKey, GCASH_ENABLED } from "@/lib/constants";
+import { historyWindowDays } from "@/lib/game";
 import { prisma } from "@/lib/prisma";
 import { toNum } from "@/lib/utils";
 
@@ -9,9 +10,11 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const user = await requireSession();
+    const since = new Date();
+    since.setUTCDate(since.getUTCDate() - historyWindowDays(user.tier));
     const wallet = await prisma.wallet.findUnique({ where: { userId: user.id } });
     const ledger = await prisma.walletLedger.findMany({
-      where: { userId: user.id },
+      where: { userId: user.id, createdAt: { gte: since } },
       orderBy: { createdAt: "desc" },
       take: 40,
     });

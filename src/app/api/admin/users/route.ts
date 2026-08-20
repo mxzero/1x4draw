@@ -38,6 +38,7 @@ export async function GET(request: Request) {
         email: u.email,
         role: u.role,
         tier: u.tier,
+        bot: u.bot,
         banned: u.banned,
         balance: toNum(u.wallet?.balance),
         dailyJoins: u.dailyJoins[0]?.count ?? 0,

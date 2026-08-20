@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -58,6 +58,7 @@ model User {
   role      Role     @default(USER)
   tier      Tier     @default(BASIC)
   banned              Boolean  @default(false)
+  bot                 Boolean  @default(false)
   subscriptionPlan    String?
   subscribedAt        DateTime?
   createdAt DateTime @default(now())
@@ -226,3 +227,10 @@ model SystemLock {
   id        String   @id
   updatedAt DateTime @updatedAt
 }
+
+model AppStatus {
+  id        String   @id @default("global")
+  mode      String   @default("beta")
+  updatedAt DateTime @updatedAt
+}
+

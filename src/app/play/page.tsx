@@ -7,9 +7,8 @@ import { AppFrame } from "@/components/app-frame";
 import { Button, Card } from "@/components/ui";
 import { useLive } from "@/hooks/use-live";
 import {
-  AUTO_JOIN_DELAY_100_MS,
-  AUTO_JOIN_DELAY_MS,
   BASIC_DAILY_JOIN_LIMIT,
+  BETA_AUTO_JOIN_DELAY_MS,
 } from "@/lib/constants";
 import { tokens } from "@/lib/utils";
 import type { AppEvent } from "@/lib/events";
@@ -24,6 +23,7 @@ type TierInfo = {
     seated: number;
     seats: number;
     players: string[];
+    joined: boolean;
   } | null;
 };
 
@@ -44,9 +44,10 @@ function SeatSquares({ players, seats = 5 }: { players: string[]; seats?: number
         return (
           <div
             key={i}
-            className={`flex aspect-square items-center justify-center rounded-md border px-1 text-center text-[10px] leading-tight ${
+            className={`flex items-center justify-center overflow-hidden rounded-[5px] border px-0.5 text-center text-[9px] leading-tight ${
               name ? "border-teal bg-teal/30 text-white" : "border-white/15 bg-black/40 text-white/25"
             }`}
+            style={{ aspectRatio: "1 / 0.6" }}
           >
             {name ?? "—"}
           </div>
@@ -71,8 +72,8 @@ export default function PlayPage() {
   const [toast, setToast] = useState<DrawToast | null>(null);
   const [joinedName, setJoinedName] = useState<string | null>(null);
   const filling = useRef(false);
+  const fillToken = useRef(0);
 
-  const isAdmin = session?.user.role === "ADMIN";
   const isBasic = session?.user.tier === "BASIC";
 
   const refresh = useCallback(async () => {
@@ -147,16 +148,19 @@ export default function PlayPage() {
 
   async function runAutoFill(tableId: string, betAmount: number, tableName: string) {
     filling.current = true;
-    const delay = betAmount === 100 ? AUTO_JOIN_DELAY_100_MS : AUTO_JOIN_DELAY_MS;
+    const token = ++fillToken.current;
+    const delay = BETA_AUTO_JOIN_DELAY_MS;
     try {
       for (let i = 0; i < 4; i++) {
         await sleep(delay);
+        if (token !== fillToken.current) return;
         const res = await fetch("/api/tables/seat-next", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ tableId }),
         });
         const data = await res.json();
+        if (token !== fillToken.current) return;
         if (!res.ok) {
           setError(data.error ?? "Auto-join stopped");
           break;
@@ -172,6 +176,7 @@ export default function PlayPage() {
                     seated: data.playerCount,
                     seats: data.seats,
                     players: data.players,
+                    joined: true,
                   },
                 }
               : tier,
@@ -183,9 +188,29 @@ export default function PlayPage() {
         }
       }
     } finally {
-      filling.current = false;
-      await refresh();
+      if (token === fillToken.current) {
+        filling.current = false;
+        await refresh();
+      }
     }
+  }
+
+  async function leave(tableId: string) {
+    setError("");
+    fillToken.current += 1;
+    filling.current = false;
+    const res = await fetch("/api/tables/leave", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tableId }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error ?? "Could not leave");
+      return;
+    }
+    setJoinedName(null);
+    await refresh();
   }
 
   async function join(betAmount: number) {
@@ -214,14 +239,14 @@ export default function PlayPage() {
   }
 
   return (
-    <AppFrame balance={balance} pool={pool}>
-      <p className="text-[11px] uppercase tracking-[0.3em] text-white/40">Select stake</p>
-      <h1 className="font-display text-4xl">Open a seat</h1>
+    <AppFrame balance={balance} pool={pool} onBalanceChange={() => void refresh()}>
+      <p className="text-[11px] uppercase tracking-[0.3em] text-white/40">Play</p>
+      <h1 className="font-display text-4xl">Select table</h1>
       <p className="mt-1 text-sm text-white/50">
         One table per row. Fifth player triggers the draw. Winner is paid 4× in Tokens (1 Token = 1 PHP).
       </p>
       {isBasic && (
-        <p className="mt-3 rounded-xl border border-sand/30 bg-sand/10 px-3 py-2 text-xs text-sand">
+        <p className="mt-3 rounded-[5px] border border-sand/30 bg-sand/10 px-3 py-2 text-xs text-sand">
           Basic: {dailyJoins}/{BASIC_DAILY_JOIN_LIMIT} tables today.{" "}
           <Link href="/subscribe" className="underline">
             Subscribe
@@ -229,13 +254,11 @@ export default function PlayPage() {
           to increase.
         </p>
       )}
-      {isAdmin && (
-        <p className="mt-3 rounded-xl border border-teal/30 bg-teal/10 px-3 py-2 text-xs text-white/70">
-          Admin join auto-fills remaining seats one by one so you can watch the table fill.
-        </p>
-      )}
+      <p className="mt-3 rounded-[5px] border border-teal/30 bg-teal/10 px-3 py-2 text-xs text-white/70">
+        Beta: bots fill remaining seats 0.5s after you join.
+      </p>
       {joinedName && (
-        <p className="mt-3 rounded-xl border border-white/10 bg-surface px-3 py-2 text-sm">
+        <p className="mt-3 rounded-[5px] border border-white/10 bg-surface px-3 py-2 text-sm">
           Joined <span className="text-sand">{joinedName}</span>
         </p>
       )}
@@ -245,22 +268,34 @@ export default function PlayPage() {
       <div className="mt-5 space-y-3">
         {tiers.map((tier) => {
           const players = tier.nextFill?.players ?? [];
+          const seatedHere = Boolean(tier.nextFill?.joined);
           return (
             <Card key={tier.betAmount} className="space-y-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="font-display text-3xl text-sand">{tokens(tier.betAmount)}</p>
-                  <p className="text-[11px] text-white/40">
+                  <p className="font-display text-[25px] leading-none text-sand">{tokens(tier.betAmount)}</p>
+                  <p className="mt-1 text-xs text-white/40">
                     {tier.nextFill?.name ? tier.nextFill.name : "No open table"} · {tier.openTables} open
                   </p>
                 </div>
-                <Button
-                  onClick={() => join(tier.betAmount)}
-                  disabled={busy === tier.betAmount}
-                  className="min-w-24"
-                >
-                  {busy === tier.betAmount ? "Joining…" : "Join"}
-                </Button>
+                <div className="flex min-w-24 flex-col gap-1">
+                  <Button
+                    onClick={() => join(tier.betAmount)}
+                    disabled={busy === tier.betAmount || seatedHere}
+                    className="w-full py-2.5"
+                  >
+                    {busy === tier.betAmount ? "Joining…" : "Join"}
+                  </Button>
+                  {seatedHere && tier.nextFill && (
+                    <Button
+                      variant="danger"
+                      onClick={() => leave(tier.nextFill!.tableId)}
+                      className="h-[21px] w-full py-0 text-[11px] leading-none"
+                    >
+                      Leave
+                    </Button>
+                  )}
+                </div>
               </div>
               <SeatSquares players={players} />
             </Card>
@@ -269,7 +304,7 @@ export default function PlayPage() {
       </div>
 
       {isBasic && (
-        <div className="mt-8 rounded-2xl border border-white/10 bg-[#1a100e] p-4">
+        <div className="mt-8 rounded-[5px] border border-white/10 bg-[#1a100e] p-4">
           <p className="text-[10px] uppercase tracking-widest text-white/40">Ad</p>
           <p className="text-sm text-sand">Go ad-free and raise your daily join cap.</p>
           <Link href="/subscribe" className="mt-2 inline-block text-xs uppercase tracking-wider text-white/70 underline">

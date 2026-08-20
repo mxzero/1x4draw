@@ -15,22 +15,20 @@ export default function HomePage() {
       <div className="space-y-3">
         <Link
           href="/login"
-          className="block rounded-2xl bg-teal py-3.5 text-center text-sm font-medium"
+          className="block rounded-[5px] bg-teal py-3.5 text-center text-sm font-medium"
         >
           Enter
         </Link>
         <Link
           href="/register"
-          className="block rounded-2xl border border-white/15 py-3.5 text-center text-sm text-white/80"
+          className="block rounded-[5px] border border-white/15 py-3.5 text-center text-sm text-white/80"
         >
           Create account
         </Link>
         <p className="pt-4 text-center text-[11px] leading-relaxed text-white/35">
-          Prototype · GCash is off. Seeded wallets start at 5,000 Tokens (1 Token = 1 PHP).
+          Prototype · GCash is off. New accounts start at 5,000 Tokens (1 Token = 1 PHP).
           <br />
-          admin@1x4.com · naruto@1x4.com · tanjiro@1x4.com
-          <br />
-          password: Pass123!
+          Admin: admin@1x4.com · password: Pass123!
         </p>
       </div>
     </main>

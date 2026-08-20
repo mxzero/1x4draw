@@ -6,7 +6,7 @@ Fixed-odds multiplayer draw. Five players, one winner, 4× payout in Tokens (1 T
 
 Next.js 15 (App Router) · TypeScript · Tailwind CSS · Prisma · NextAuth credentials
 
-This prototype uses **SQLite** locally. `docker-compose.yml` is included if you switch Prisma to PostgreSQL.
+This prototype uses **PostgreSQL**. Set `DATABASE_URL` in `.env` (Prisma Postgres, Neon, or Docker).
 
 ## Run locally
 
@@ -20,15 +20,15 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Prototype accounts
 
-Password for all seeded users: `Pass123!`
+Create a new account from the home page, or sign in as admin:
 
 | Role | Login | Notes |
 | --- | --- | --- |
-| Admin | `admin@1x4.com` | Auto-fills remaining seats (1s delay, 2s on 100) |
-| Pro | `naruto@1x4.com` … `saitama@1x4.com` | Ad-free, raffle-eligible |
-| Basic | `tanjiro@1x4.com`, `spike@1x4.com` | Ads + 10 joins/day |
+| Admin | `admin@1x4.com` / `Pass123!` | Admin console |
+| New user | Register | Basic, 5,000 Tokens, not a bot |
+| Table bots | Seeded automatically | Random 6–10 character alphanumeric names, `bot: true` |
 
-Each wallet starts at 5,000 Tokens.
+Beta mode seats bots into empty chairs 0.5s after a real player joins.
 
 ## Rules
 

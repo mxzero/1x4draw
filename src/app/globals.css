@@ -23,7 +23,7 @@ body {
 }
 
 .seat-dot {
-  @apply h-2.5 w-2.5 rounded-full border border-white/20;
+  @apply h-2.5 w-2.5 rounded-[5px] border border-white/20;
 }
 
 .ticker {

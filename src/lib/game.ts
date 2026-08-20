@@ -74,11 +74,11 @@ async function assertCanJoin(tx: Tx, user: UserWithWallet, betAmount: number) {
     where: { userId_date: { userId: user.id, date: day } },
   });
 
-  if (user.tier === "BASIC") {
+  if (user.tier === "BASIC" && !user.bot) {
     if ((stats?.count ?? 0) >= BASIC_DAILY_JOIN_LIMIT) {
       throw new GameError("Daily join limit reached (10). Subscribe to increase.", "DAILY_JOIN_LIMIT");
     }
-  } else {
+  } else if (!user.bot) {
     const spend = toNum(stats?.spend);
     if (spend + betAmount > PREMIUM_DAILY_SPEND_CAP) {
       throw new GameError("Daily wager cap reached (10,000 Tokens)", "DAILY_SPEND_CAP");
@@ -191,15 +191,16 @@ function shufflePick<T>(items: T[], n: number): T[] {
 async function seatOneCandidate(tx: Tx, tableId: string, betAmount: number, tableName: string, excludeIds: string[]) {
   const candidates = await tx.user.findMany({
     where: {
-      id: { notIn: excludeIds },
+      ...(excludeIds.length ? { id: { notIn: excludeIds } } : {}),
+      bot: true,
       role: Role.USER,
       banned: false,
     },
     include: { wallet: true },
-    orderBy: { createdAt: "asc" },
   });
+  const shuffled = shufflePick(candidates, candidates.length);
 
-  for (const candidate of candidates) {
+  for (const candidate of shuffled) {
     try {
       await assertCanJoin(tx, candidate, betAmount);
       await seatPlayer(tx, tableId, candidate, betAmount, tableName);
@@ -317,6 +318,12 @@ async function completeDraw(tx: Tx, tableId: string, tableName: string, betAmoun
   };
 }
 
+async function isBetaMode(tx?: Tx) {
+  const db = tx ?? prisma;
+  const row = await db.appStatus.findUnique({ where: { id: "global" } });
+  return (row?.mode ?? "beta") === "beta";
+}
+
 export async function joinBet(userId: string, betAmount: number) {
   if (!isBetValue(betAmount)) {
     throw new GameError("Bet must be 5, 10, 20, 50, or 100 Tokens", "INVALID_BET");
@@ -352,6 +359,7 @@ export async function joinBet(userId: string, betAmount: number) {
             ? await completeDraw(tx, table.id, table.name, betAmount, players)
             : null;
 
+        const beta = await isBetaMode(tx);
         return {
           tableId: table.id,
           tableName: table.name,
@@ -359,7 +367,7 @@ export async function joinBet(userId: string, betAmount: number) {
           playerCount: players.length,
           seats: PLAYERS_PER_TABLE,
           players: players.map((p) => p.user.username),
-          autoFill: user.role === Role.ADMIN && players.length < PLAYERS_PER_TABLE,
+          autoFill: beta && !user.bot && players.length < PLAYERS_PER_TABLE,
           draw,
         };
       },
@@ -405,10 +413,79 @@ function emitDraw(result: {
   }
 }
 
-export async function seatNextPlayer(adminId: string, tableId: string) {
-  const admin = await prisma.user.findUnique({ where: { id: adminId } });
-  if (!admin || admin.role !== Role.ADMIN) {
-    throw new GameError("Admin only", "FORBIDDEN", 403);
+export async function leaveTable(userId: string, tableId: string) {
+  const result = await withRetry(() =>
+    prisma.$transaction(async (tx) => {
+      const table = await tx.gameTable.findUnique({ where: { id: tableId } });
+      if (!table) throw new GameError("Table not found", "NOT_FOUND", 404);
+      if (table.status !== "OPEN") {
+        throw new GameError("You can only leave before the draw starts", "TABLE_CLOSED");
+      }
+      await lockBet(tx, table.betAmount);
+
+      const seat = await tx.tablePlayer.findFirst({
+        where: { tableId, userId, result: "PENDING" },
+      });
+      if (!seat) throw new GameError("You are not seated at this table", "NOT_SEATED");
+
+      await tx.tablePlayer.delete({ where: { id: seat.id } });
+
+      const wallet = await tx.wallet.update({
+        where: { userId },
+        data: { balance: { increment: table.betAmount } },
+      });
+
+      await tx.walletLedger.create({
+        data: {
+          userId,
+          type: "ADJUSTMENT",
+          amount: table.betAmount,
+          balanceAfter: wallet.balance,
+          note: `Left ${table.name} · refund ${tokens(table.betAmount)}`,
+        },
+      });
+
+      const stats = await tx.dailyJoinStat.findUnique({
+        where: { userId_date: { userId, date: utcToday() } },
+      });
+      if (stats && stats.count > 0) {
+        await tx.dailyJoinStat.update({
+          where: { id: stats.id },
+          data: {
+            count: { decrement: 1 },
+            spend: { decrement: table.betAmount },
+          },
+        });
+      }
+
+      return {
+        tableId: table.id,
+        tableName: table.name,
+        betAmount: table.betAmount,
+        refunded: table.betAmount,
+        balance: toNum(wallet.balance),
+      };
+    }),
+  );
+
+  emitGlobal({ type: "TABLE_UPDATE", tableId: result.tableId, betAmount: result.betAmount });
+  return result;
+}
+
+export async function seatNextPlayer(requesterId: string, tableId: string) {
+  const requester = await prisma.user.findUnique({ where: { id: requesterId } });
+  if (!requester) throw new GameError("Sign in required", "UNAUTHENTICATED", 401);
+
+  const beta = await isBetaMode();
+  if (!beta && requester.role !== Role.ADMIN) {
+    throw new GameError("Auto-fill is only available in beta", "NOT_BETA", 403);
+  }
+
+  const seatedCheck = await prisma.tablePlayer.findFirst({
+    where: { tableId, userId: requesterId },
+  });
+  if (!seatedCheck && requester.role !== Role.ADMIN) {
+    throw new GameError("You are not seated at this table", "FORBIDDEN", 403);
   }
 
   const result = await withRetry(() =>
@@ -482,7 +559,7 @@ export async function runMonthlyRaffle() {
     }
 
     const eligible = await tx.user.findMany({
-      where: { tier: Tier.PREMIUM, banned: false, role: Role.USER },
+      where: { tier: Tier.PREMIUM, banned: false, role: Role.USER, bot: false },
     });
     if (eligible.length === 0) {
       throw new GameError("No eligible premium subscribers", "NO_ELIGIBLE");

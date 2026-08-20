@@ -20,7 +20,7 @@ export function Card({
   className?: string;
 }) {
   return (
-    <div className={cn("rounded-2xl border border-white/10 bg-surface p-4", className)}>
+    <div className={cn("rounded-[5px] border border-white/10 bg-surface p-4", className)}>
       {children}
     </div>
   );
@@ -42,7 +42,7 @@ export function Button({ className, variant = "primary", ...props }: BtnProps) {
   return (
     <button
       className={cn(
-        "inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-medium transition",
+        "inline-flex items-center justify-center rounded-[5px] px-4 py-2.5 text-sm font-medium transition",
         styles,
         className,
       )}
@@ -66,7 +66,7 @@ export function Badge({
     premium: "bg-sand/20 text-sand",
   }[tone];
   return (
-    <span className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wide", styles)}>
+    <span className={cn("rounded-[5px] px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wide", styles)}>
       {children}
     </span>
   );

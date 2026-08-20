@@ -49,7 +49,9 @@ export default function RegisterPage() {
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6">
       <Logo className="mb-8 text-5xl" />
       <h1 className="font-display text-3xl">Create account</h1>
-      <p className="mt-1 text-sm text-white/50">Starts as Basic with 5,000 Tokens (1 Token = 1 PHP).</p>
+      <p className="mt-1 text-sm text-white/50">
+        Starts as Basic with 5,000 Tokens (1 Token = 1 PHP). Username: 3–10 letters or numbers.
+      </p>
 
       <form onSubmit={onSubmit} className="mt-8 space-y-4">
         <label className="block text-xs uppercase tracking-widest text-white/40">
@@ -58,7 +60,10 @@ export default function RegisterPage() {
             name="username"
             required
             minLength={3}
-            className="mt-2 w-full rounded-xl border border-white/10 bg-surface px-4 py-3 text-base outline-none focus:border-sand"
+            maxLength={10}
+            pattern="[A-Za-z0-9]+"
+            title="3–10 letters or numbers"
+            className="mt-2 w-full rounded-[5px] border border-white/10 bg-surface px-4 py-3 text-base outline-none focus:border-sand"
           />
         </label>
         <label className="block text-xs uppercase tracking-widest text-white/40">
@@ -67,7 +72,7 @@ export default function RegisterPage() {
             name="email"
             type="email"
             required
-            className="mt-2 w-full rounded-xl border border-white/10 bg-surface px-4 py-3 text-base outline-none focus:border-sand"
+            className="mt-2 w-full rounded-[5px] border border-white/10 bg-surface px-4 py-3 text-base outline-none focus:border-sand"
           />
         </label>
         <label className="block text-xs uppercase tracking-widest text-white/40">
@@ -77,7 +82,7 @@ export default function RegisterPage() {
             type="password"
             required
             minLength={6}
-            className="mt-2 w-full rounded-xl border border-white/10 bg-surface px-4 py-3 text-base outline-none focus:border-sand"
+            className="mt-2 w-full rounded-[5px] border border-white/10 bg-surface px-4 py-3 text-base outline-none focus:border-sand"
           />
         </label>
         {error && <p className="text-sm text-[#f0a8a3]">{error}</p>}

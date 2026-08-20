@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    await requireSession();
+    const user = await requireSession();
 
     const open = await prisma.gameTable.findMany({
       where: { status: "OPEN" },
@@ -36,6 +36,7 @@ export async function GET() {
               seated: first._count.players,
               seats: PLAYERS_PER_TABLE,
               players: first.players.map((p) => p.user.username),
+              joined: first.players.some((p) => p.userId === user.id),
             }
           : null,
       };

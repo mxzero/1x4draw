@@ -11,6 +11,7 @@ type UserRow = {
   email: string;
   role: string;
   tier: string;
+  bot?: boolean;
   banned: boolean;
   balance: number;
   dailyJoins: number;
@@ -85,7 +86,7 @@ export default function AdminUsersPage() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search username or email"
-          className="flex-1 rounded-xl border border-white/10 bg-surface px-4 py-2.5 text-sm outline-none focus:border-sand"
+          className="flex-1 rounded-[5px] border border-white/10 bg-surface px-4 py-2.5 text-sm outline-none focus:border-sand"
         />
         <Button type="submit">Search</Button>
       </form>
@@ -105,6 +106,7 @@ export default function AdminUsersPage() {
               </div>
               <div className="flex flex-col items-end gap-1">
                 <Badge tone={user.tier === "PREMIUM" ? "premium" : "neutral"}>{user.tier}</Badge>
+                {user.bot && <Badge tone="pending">Bot</Badge>}
                 {user.banned && <Badge tone="lost">Banned</Badge>}
                 {user.role === "ADMIN" && <Badge tone="pending">Admin</Badge>}
               </div>
@@ -149,12 +151,12 @@ export default function AdminUsersPage() {
                 step="0.01"
                 required
                 placeholder="Amount (+ credit / − debit)"
-                className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-sm outline-none focus:border-sand"
+                className="w-full rounded-[5px] border border-white/10 bg-black px-4 py-3 text-sm outline-none focus:border-sand"
               />
               <input
                 name="note"
                 placeholder="Note"
-                className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-sm outline-none focus:border-sand"
+                className="w-full rounded-[5px] border border-white/10 bg-black px-4 py-3 text-sm outline-none focus:border-sand"
               />
               <div className="flex gap-2">
                 <Button type="submit" className="flex-1">

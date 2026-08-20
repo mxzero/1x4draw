@@ -10,6 +10,7 @@ type Eligible = {
   username: string;
   email: string;
   tier: string;
+  bot?: boolean;
   createdAt: string;
   subscribedAt: string | null;
   subscriptionPlan: string | null;
@@ -94,7 +95,7 @@ export default function AdminRewardsPage() {
         {eligible.map((u) => (
           <div
             key={u.id}
-            className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-surface px-4 py-3"
+            className="flex items-center justify-between gap-3 rounded-[5px] border border-white/10 bg-surface px-4 py-3"
           >
             <div>
               <p className="text-sm">{u.username}</p>
@@ -103,9 +104,12 @@ export default function AdminRewardsPage() {
                 {u.subscriptionPlan ? ` · ${u.subscriptionPlan}` : ""}
               </p>
             </div>
-            <Badge tone={u.tier === "PREMIUM" ? "premium" : "neutral"}>
-              {u.tier === "PREMIUM" ? "Pro" : "Basic"}
-            </Badge>
+            <div className="flex flex-col items-end gap-1">
+              {u.bot && <Badge tone="pending">Bot</Badge>}
+              <Badge tone={u.tier === "PREMIUM" ? "premium" : "neutral"}>
+                {u.tier === "PREMIUM" ? "Pro" : "Basic"}
+              </Badge>
+            </div>
           </div>
         ))}
       </div>

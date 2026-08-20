@@ -14,11 +14,14 @@ export async function POST(request: Request) {
   const email = body.email?.trim().toLowerCase();
   const password = body.password ?? "";
 
-  if (!username || username.length < 3) {
-    return NextResponse.json({ error: "Username must be at least 3 characters" }, { status: 400 });
+  if (!username || username.length < 3 || username.length > 10 || !/^[a-z0-9]+$/.test(username)) {
+    return NextResponse.json(
+      { error: "Username must be 3–10 letters or numbers" },
+      { status: 400 },
+    );
   }
-  if (!email || !email.includes("@")) {
-    return NextResponse.json({ error: "Valid email required" }, { status: 400 });
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return NextResponse.json({ error: "Enter a valid email address" }, { status: 400 });
   }
   if (password.length < 6) {
     return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 });

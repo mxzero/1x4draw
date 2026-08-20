@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button, Logo } from "@/components/ui";
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState("");
@@ -14,10 +16,15 @@ export default function LoginPage() {
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
-    setLoading(true);
     const form = new FormData(e.currentTarget);
+    const email = String(form.get("email") ?? "").trim();
+    if (!EMAIL_RE.test(email)) {
+      setError("Enter a valid email address.");
+      return;
+    }
+    setLoading(true);
     const result = await signIn("credentials", {
-      email: String(form.get("email") ?? ""),
+      email,
       password: String(form.get("password") ?? ""),
       redirect: false,
     });
@@ -34,17 +41,17 @@ export default function LoginPage() {
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6">
       <Logo className="mb-8 text-5xl" />
       <h1 className="font-display text-3xl">Sign in</h1>
-      <p className="mt-1 text-sm text-white/50">Email or username · prototype accounts share Pass123!</p>
+      <p className="mt-1 text-sm text-white/50">Use your email and password.</p>
 
-      <form onSubmit={onSubmit} className="mt-8 space-y-4">
+      <form onSubmit={onSubmit} className="mt-8 space-y-4" noValidate>
         <label className="block text-xs uppercase tracking-widest text-white/40">
-          Email / username
+          Email
           <input
             name="email"
+            type="email"
             required
-            autoComplete="username"
-            className="mt-2 w-full rounded-xl border border-white/10 bg-surface px-4 py-3 text-base text-white outline-none focus:border-sand"
-            placeholder="admin@1x4.com"
+            autoComplete="email"
+            className="mt-2 w-full rounded-[5px] border border-white/10 bg-surface px-4 py-3 text-base text-white outline-none focus:border-sand"
           />
         </label>
         <label className="block text-xs uppercase tracking-widest text-white/40">
@@ -54,8 +61,7 @@ export default function LoginPage() {
             type="password"
             required
             autoComplete="current-password"
-            className="mt-2 w-full rounded-xl border border-white/10 bg-surface px-4 py-3 text-base text-white outline-none focus:border-sand"
-            placeholder="Pass123!"
+            className="mt-2 w-full rounded-[5px] border border-white/10 bg-surface px-4 py-3 text-base text-white outline-none focus:border-sand"
           />
         </label>
         {error && <p className="text-sm text-[#f0a8a3]">{error}</p>}

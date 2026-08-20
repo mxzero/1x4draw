@@ -15,8 +15,8 @@ export const MONTHLY_RAFFLE_WINNERS = 10;
 export const GCASH_ENABLED = process.env.GCASH_ENABLED === "true";
 export const SUBSCRIBE_MONTHLY_USD = 1.99;
 export const SUBSCRIBE_YEARLY_USD = 10.99;
-export const AUTO_JOIN_DELAY_MS = 1000;
-export const AUTO_JOIN_DELAY_100_MS = 2000;
+export const AUTO_JOIN_DELAY_MS = 500;
+export const BETA_AUTO_JOIN_DELAY_MS = 500;
 
 export function isBetValue(value: number): value is BetValue {
   return (BET_VALUES as readonly number[]).includes(value);

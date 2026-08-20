@@ -5,16 +5,21 @@ import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { History, LayoutDashboard, LogOut, Spade, Wallet } from "lucide-react";
 import { Logo } from "@/components/ui";
+import { BuyTokensButton } from "@/components/buy-tokens";
 import { cn, tokens } from "@/lib/utils";
 
 export function AppHeader({
   balance,
   pool,
   premium,
+  showBuy,
+  onBalanceChange,
 }: {
   balance: number;
   pool?: number;
   premium: boolean;
+  showBuy?: boolean;
+  onBalanceChange?: () => void;
 }) {
   const { data } = useSession();
   return (
@@ -39,15 +44,20 @@ export function AppHeader({
           </div>
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
-            className="rounded-full p-2 text-white/50 hover:bg-white/10 hover:text-white"
+            className="rounded-[5px] p-2 text-white/50 hover:bg-white/10 hover:text-white"
             aria-label="Sign out"
           >
             <LogOut size={16} />
           </button>
         </div>
       </div>
-      <div className="mx-auto max-w-3xl px-4 pb-2 text-[11px] text-white/40">
-        {data?.user.username} · {data?.user.tier === "PREMIUM" ? "Pro" : "Basic"}
+      <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 pb-2">
+        <p className="min-w-0 truncate text-[11px] text-white/40">
+          {data?.user.username} · {data?.user.tier === "PREMIUM" ? "Pro" : "Basic"}
+        </p>
+        {showBuy && (
+          <BuyTokensButton className="h-8 shrink-0 px-3 py-1 text-xs" onDone={onBalanceChange} />
+        )}
       </div>
     </header>
   );
@@ -92,13 +102,13 @@ export function AdBanner() {
     <div className="fixed bottom-[4.25rem] left-0 right-0 z-30 px-3 pb-[env(safe-area-inset-bottom)]">
       <Link
         href="/subscribe"
-        className="mx-auto flex max-w-3xl items-center justify-between rounded-xl border border-white/10 bg-[#1a100e] px-4 py-3"
+        className="mx-auto flex max-w-3xl items-center justify-between rounded-[5px] border border-white/10 bg-[#1a100e] px-4 py-3"
       >
         <div>
           <p className="text-[10px] uppercase tracking-widest text-white/40">Ad</p>
           <p className="text-sm text-sand">Subscribe to hide ads and join more tables.</p>
         </div>
-        <span className="rounded-lg bg-sand/20 px-2 py-1 text-[10px] text-sand">AD</span>
+        <span className="rounded-[5px] bg-sand/20 px-2 py-1 text-[10px] text-sand">AD</span>
       </Link>
     </div>
   );

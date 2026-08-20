@@ -35,7 +35,7 @@ export function AdminFrame({
               key={link.href}
               href={link.href}
               className={cn(
-                "whitespace-nowrap rounded-full px-3 py-1.5 text-xs uppercase tracking-wider",
+                "whitespace-nowrap rounded-[5px] px-3 py-1.5 text-xs uppercase tracking-wider",
                 active ? "bg-teal text-white" : "bg-white/5 text-white/50",
               )}
             >

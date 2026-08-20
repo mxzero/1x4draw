@@ -71,7 +71,7 @@ export default function AdminTablesPage() {
               </div>
               <Badge tone="pending">{table.status}</Badge>
             </div>
-            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
+            <div className="mt-3 h-1.5 overflow-hidden rounded-[5px] bg-white/10">
               <div className="h-full bg-teal" style={{ width: `${table.fillRate * 100}%` }} />
             </div>
             <p className="mt-2 text-xs text-white/45">{table.players.join(" · ") || "Empty"}</p>
@@ -84,7 +84,7 @@ export default function AdminTablesPage() {
         {history.map((table) => (
           <div
             key={table.id}
-            className="flex items-center justify-between rounded-xl border border-white/5 bg-surface px-4 py-3"
+            className="flex items-center justify-between rounded-[5px] border border-white/5 bg-surface px-4 py-3"
           >
             <div>
               <p className="text-sm">
